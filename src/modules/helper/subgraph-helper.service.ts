@@ -18,7 +18,11 @@ import axios from 'axios';
 import { logger } from 'src/commons';
 import {
   CmsSummaryTransactionQueryVariables,
+  ErcContractQuery,
+  ErcContractQueryVariables,
   EventType,
+  GetNfTsSelling1155QueryVariables,
+  GetNfTsSelling721QueryVariables,
   getSdk,
 } from 'src/generated/graphql';
 
@@ -189,6 +193,40 @@ class subgraphServiceCommon {
     const client = new GraphQLClient(process.env.SUBGRAPH_URL);
     const sdk = getSdk(client);
     const response = await sdk.CMSSummaryVolume({ address: address });
+    return response;
+  }
+
+  async getCollectionCount(
+    collectionAddress: string,
+  ): Promise<ErcContractQuery> {
+    const client = new GraphQLClient(process.env.SUBGRAPH_URL);
+    const sdk = getSdk(client);
+    const variables: ErcContractQueryVariables = { id: collectionAddress };
+    const response = sdk.ErcContract(variables);
+    return response;
+  }
+
+  async getFloorPrice721(adress?: string, skip?: number, first?: number) {
+    const client = new GraphQLClient(process.env.SUBGRAPH_URL);
+    const sdk = getSdk(client);
+    const variables: GetNfTsSelling721QueryVariables = {
+      collection: adress,
+      first,
+      skip,
+    };
+    const response = sdk.GetNFTsSelling721(variables);
+    return response;
+  }
+
+  async getFloorPrice1155(address?: string, skip?: number, first?: number) {
+    const client = new GraphQLClient(process.env.SUBGRAPH_URL);
+    const sdk = getSdk(client);
+    const variables: GetNfTsSelling1155QueryVariables = {
+      first,
+      skip,
+      collection: address,
+    };
+    const response = await sdk.GetNFTsSelling1155(variables);
     return response;
   }
 }

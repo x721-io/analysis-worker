@@ -5,7 +5,6 @@ import * as session from 'express-session';
 import * as cookieParser from 'cookie-parser';
 // import helmet from 'helmet';
 import { ValidationPipe } from '@nestjs/common';
-import { CollectionsUtilsProcessor } from './modules/job-queue/collection-utils.processor';
 // import { GraphQLErrorFilter } from './commons/errors/ExceptionFilter';
 function matchRegexArray(arr: string[], str: string): boolean {
   for (const pattern of arr) {
@@ -16,7 +15,6 @@ function matchRegexArray(arr: string[], str: string): boolean {
   }
   return false;
 }
-export let collectionsUtils: CollectionsUtilsProcessor = null;
 
 const whitelist = ['http://localhost:3000'];
 
@@ -35,11 +33,6 @@ async function bootstrap() {
     },
     credentials: true,
   });
-  if (process.env.SYNC_METRIC_POINT === 'true') {
-    collectionsUtils = app.get(CollectionsUtilsProcessor);
-    collectionsUtils.handleSyncMetricPoint();
-  }
-
   app.use(compression());
   await app.listen(7777);
 }

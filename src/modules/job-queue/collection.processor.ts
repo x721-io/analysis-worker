@@ -3,10 +3,11 @@ import { GraphQLClient } from 'graphql-request';
 import {
   GetCollections1155QueryVariables,
   GetCollections721QueryVariables,
+  GetNfTsSelling721QueryVariables,
   getSdk,
 } from 'src/generated/graphql';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { TX_STATUS } from '@prisma/client';
+import { CONTRACT_TYPE, Prisma, TX_STATUS } from '@prisma/client';
 import { Processor, Process, OnQueueFailed } from '@nestjs/bull';
 import { Job } from 'bull';
 import { QUEUE_NAME_COLLECTION } from 'src/constants/Job.constant';
@@ -14,13 +15,31 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import subgraphServiceCommon from '../helper/subgraph-helper.service';
 import { RedisSubscriberService } from './redis.service';
 import { logger } from 'src/commons';
-interface SyncCollection {
-  txCreation: string;
-  type: 'ERC721' | 'ERC1155';
+import { OnModuleInit } from '@nestjs/common';
+import { ethers } from 'ethers';
+import PQueue from 'p-queue';
+
+interface CollectionGeneral {
+  totalOwner: number;
+  volumn: string;
+  totalNft: number;
+  // floorPrice: bigint;
+}
+
+interface AnalysisObject {
+  totalOwner: number;
+  type: CONTRACT_TYPE;
+  volume: number;
+  volumeWei: string;
+  totalNft: number;
+  floorPrice: number;
+  address: string;
+  id: string;
+  // floorPrice: bigint;
 }
 
 @Processor(QUEUE_NAME_COLLECTION)
-export class CollectionsCheckProcessor {
+export class CollectionsCheckProcessor implements OnModuleInit {
   private readonly endpoint = process.env.SUBGRAPH_URL;
 
   constructor(
@@ -32,122 +51,118 @@ export class CollectionsCheckProcessor {
     return new GraphQLClient(this.endpoint);
   }
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
-  async handlePendingCollection() {
-    const pendingCollections = await this.prisma.collection.findMany({
-      where: {
-        OR: [{ status: TX_STATUS.PENDING }],
-      },
-    });
-    for (let i = 0; i < pendingCollections.length; i++) {
-      // await this.crawlNftInfoToDbSingle(
-      //   pendingNfts[i],
-      //   pendingNfts[i].collection,
-      // );
-      await this.getAndSetCollectionStatus(
-        pendingCollections[i].txCreationHash,
-        pendingCollections[i].type,
-      );
-    }
+  async onModuleInit() {
+    logger.info(`call First time: QUEUE_NAME_CMS `);
+    await Promise.allSettled([this.GetAnalysisCollection()]);
   }
-  @Process('collection-create')
-  private async checkCollectionStatus(
-    job: Job<SyncCollection>,
-  ): Promise<boolean> {
-    const { txCreation, type } = job.data;
+
+  @Cron('00 23 * * *')
+  async GetAnalysisCollection() {
     try {
-      return await this.getAndSetCollectionStatus(txCreation, type);
-    } catch (err) {
-      throw new Error(err);
-    }
-  }
-
-  async getAndSetCollectionStatus(
-    txCreation: string,
-    type: string,
-  ): Promise<boolean> {
-    let isExisted = false;
-    const client = this.getGraphqlClient();
-    const sdk = getSdk(client);
-    if (type === 'ERC721') {
-      const variables: GetCollections721QueryVariables = {
-        txCreation: txCreation,
-      };
-      try {
-        const response = await sdk.GetCollections721(variables);
-        if (response.erc721Contracts.length > 0) {
-          await this.prisma.collection.update({
-            where: {
-              txCreationHash: txCreation,
-            },
-            data: {
-              status: TX_STATUS.SUCCESS,
-              address: response.erc721Contracts[0].id,
-            },
-          });
-          isExisted = true;
-          return isExisted;
-        } else {
-          throw new Error('NO TX FOUND YET');
-        }
-      } catch (err) {
-        console.log(err);
-        throw err;
-      }
-    } else {
-      const variables: GetCollections1155QueryVariables = {
-        txCreation: txCreation,
-      };
-      try {
-        const response = await sdk.GetCollections1155(variables);
-        console.log(response);
-        if (response.erc1155Contracts.length > 0) {
-          await this.prisma.collection.update({
-            where: {
-              txCreationHash: txCreation,
-            },
-            data: {
-              status: TX_STATUS.SUCCESS,
-              address: response.erc1155Contracts[0].id,
-            },
-          });
-          isExisted = true;
-          return isExisted;
-        } else {
-          throw new Error('NO TX FOUND YET');
-        }
-      } catch (err) {
-        console.log(err);
-        throw err;
-      }
-    }
-  }
-
-  @OnQueueFailed()
-  private async onCollectionCreateFail(job: Job<SyncCollection>, error: Error) {
-    console.error(`Job failed: ${job.id} with error: ${error.message}`);
-    const retry = job.attemptsMade;
-    const hash = job.data.txCreation;
-
-    try {
-      if (retry >= parseInt(process.env.MAX_RETRY))
-        await this.prisma.collection.update({
+      const batchSize = 100;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const listCollection = await this.prisma.collection.findMany({
           where: {
-            txCreationHash: hash,
+            status: 'SUCCESS',
           },
-          data: {
-            status: TX_STATUS.FAILED,
+          select: {
+            id: true,
+            address: true,
+            flagExtend: true,
+            type: true,
+            floorPrice: true,
+            txCreationHash: true,
           },
+          take: batchSize,
+          skip: offset,
         });
-      logger.info(`Updated status to FAILED for txCreationHash: ${hash}`);
-    } catch (prismaError) {
-      logger.error(
-        `Error updating status in database: ${JSON.stringify(prismaError)}`,
-      );
+        if (listCollection?.length > 0) {
+          const analysisPromises = listCollection.map(async (item) => {
+            const {
+              volumn: volume,
+              totalNft,
+              totalOwner,
+            } = await this.getGeneralCollectionData(
+              item.address,
+              item.type,
+              item.flagExtend,
+            );
+            const inputAnalysis: AnalysisObject = {
+              ...item,
+              floorPrice: Number(item.floorPrice),
+              volume: this.weiToEther(volume),
+              volumeWei: `${volume}`,
+              totalNft: Number(totalNft),
+              totalOwner: Number(totalOwner),
+            };
+            return this.getAndCaculator(inputAnalysis);
+          });
+          await Promise.allSettled(analysisPromises);
+          offset += batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      logger.info('GetAnalysisCollection successful');
+    } catch (error) {
+      logger.error(`getCountVolume: ${error}`);
     }
   }
-  @Cron(CronExpression.EVERY_10_SECONDS)
-  async handleCountExternalCollection() {
+
+  async getGeneralCollectionData(
+    collectionAddress: string,
+    type: CONTRACT_TYPE,
+    flagExtend = false,
+  ): Promise<CollectionGeneral> {
+    if (!collectionAddress) {
+      return {
+        volumn: '0',
+        totalOwner: Number(0),
+        totalNft: Number(0),
+        // floorPrice: BigInt(0),
+      };
+    }
+    let totalNftExternal = 0;
+    let totalOwnerExternal = 0;
+
+    if (!!flagExtend) {
+      const resultExternal =
+        await subgraphServiceCommon.getAllCollectionExternal(collectionAddress);
+      totalNftExternal = resultExternal.totalNftExternal;
+      totalOwnerExternal = resultExternal.totalOwnerExternal;
+    }
+
+    const [statusCollection] = await Promise.all([
+      subgraphServiceCommon.getCollectionCount(collectionAddress),
+      // this.getVolumeCollection(collectionAddress),
+    ]);
+
+    if (type === 'ERC721') {
+      return {
+        volumn: statusCollection.erc721Contract?.volume || 0,
+        totalOwner: !!flagExtend
+          ? totalOwnerExternal
+          : statusCollection.erc721Contract?.holderCount || 0,
+        totalNft: !!flagExtend
+          ? totalNftExternal
+          : statusCollection.erc721Contract?.count || 0,
+      };
+    } else {
+      return {
+        volumn: statusCollection.erc1155Contract?.volume || 0,
+        totalOwner: !!flagExtend
+          ? totalOwnerExternal
+          : statusCollection.erc1155Contract?.holderCount || 0,
+        totalNft: !!flagExtend
+          ? totalNftExternal
+          : statusCollection.erc1155Contract?.count || 0,
+      };
+    }
+  }
+
+  async CountExternalCollection() {
     try {
       const externalCollections = await this.prisma.collection.findMany({
         where: {
@@ -177,9 +192,48 @@ export class CollectionsCheckProcessor {
       }
       logger.info('handleExternalCollection successful');
     } catch (error) {
-      logger.error(
-        `HandleExternalCollection Fail 10 seconds: ${JSON.stringify(error)}`,
-      );
+      logger.error(`CountExternalCollection: ${JSON.stringify(error)}`);
     }
+  }
+
+  async getAndCaculator(input: AnalysisObject) {
+    try {
+      const dateObj = new Date();
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+      const year = dateObj.getFullYear();
+
+      // Combine them into the desired format "20240824"
+      const formattedDate = `${day}${month}${year}`;
+      const collectionId_createdAt = `${input.address.toLowerCase()}_${formattedDate}`;
+
+      const checkExist = await this.prisma.analysisCollection.findUnique({
+        where: {
+          id: collectionId_createdAt,
+        },
+      });
+      if (!checkExist) {
+        await this.prisma.analysisCollection.create({
+          data: {
+            keyTime: formattedDate,
+            id: collectionId_createdAt,
+            collectionId: input.id,
+            volumeWei: input.volumeWei,
+            type: input.type,
+            address: input.address,
+            floorPrice: input.floorPrice,
+            volume: input.volume,
+            owner: input.totalOwner,
+            items: input.totalNft,
+          },
+        });
+      }
+    } catch (error) {
+      logger.error(`getAndCaculator: ${error}`);
+    }
+  }
+
+  weiToEther(wei) {
+    return wei / 1000000000000000000;
   }
 }

@@ -1,15 +1,15 @@
 version: '3'
 services:
-  ext-server:
-    container_name: u2u-server-worker
+  ext-server-analysis:
+    container_name: u2u-server-worker-analysis
     build:
       context: .
       dockerfile: Dockerfile
     restart: always
     ports:
-      - '8887:7777'
+      - '8887:7776'
     volumes:
-      - ../logs/u2u-marketplace-worker:/usr/src/app/u2u-server-worker/logs
+      - ../logs/u2u-marketplace-worker-analysis:/usr/src/app/u2u-server-worker-analysis/logs
     networks:
       - u2u-nw
     env_file:

@@ -1,18 +1,12 @@
 import { GraphQLClient } from 'graphql-request';
-import {
-  EventType,
-  GetNfTsSelling1155QueryVariables,
-  GetNfTsSelling721QueryVariables,
-  getSdk,
-} from 'src/generated/graphql';
+import { EventType } from 'src/generated/graphql';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Processor, Process } from '@nestjs/bull';
-import { Job } from 'bull';
+import { Processor } from '@nestjs/bull';
 import { QUEUE_NAME_CMS } from 'src/constants/Job.constant';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { logger } from 'src/commons';
 import { OnModuleInit } from '@nestjs/common';
-import { CONTRACT_TYPE, Prisma, TX_STATUS } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import subgraphServiceCommon from '../helper/subgraph-helper.service';
 import { ethers } from 'ethers';
 import { RedisSubscriberService } from './redis.service';

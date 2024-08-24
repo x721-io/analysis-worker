@@ -1,10 +1,10 @@
 # Use Node.js as the base image
-FROM node:20.2.0-alpine3.18
+FROM node:20.9.0-alpine3.18
 
 RUN apk update && apk add --no-cache python3 make g++ xdg-utils
 
 # Set the working directory
-WORKDIR /usr/src/app/u2u-server-worker
+WORKDIR /usr/src/app/u2u-server-worker-analysis
 
 # Install the Nest CLI globally
 RUN yarn global add @nestjs/cli

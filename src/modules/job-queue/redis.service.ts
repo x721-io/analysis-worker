@@ -28,10 +28,6 @@ export class RedisSubscriberService implements OnModuleInit {
   onModuleInit() {
     this.redisClient.subscribe('collection-channel');
     this.redisClient.subscribe('nft-channel');
-    this.redisClient.subscribe('ipfs');
-    this.redisClient.subscribe('project-channel');
-    this.redisClient.subscribe('user-channel');
-    this.redisClient.subscribe('collectionUtils-channel');
     this.redisClient.on('message', this.handleMessage.bind(this));
   }
 
@@ -40,27 +36,6 @@ export class RedisSubscriberService implements OnModuleInit {
     if (channel === 'collection-channel') {
       const jobData = JSON.parse(message);
       this.queueService.addCollectionJob(jobData.process, jobData.data);
-    }
-    if (channel === 'collectionUtils-channel') {
-      const jobData = JSON.parse(message);
-      this.queueService.addCollectionUtilsJob(jobData.process, jobData.data);
-    }
-    if (channel === 'nft-channel') {
-      const jobData = JSON.parse(message);
-      this.queueService.addNftJob(jobData.process, jobData.data);
-    }
-    if (channel === 'ipfs') {
-      const jobData = JSON.parse(message);
-      // console.log('here: ', jobData)
-      this.queueService.addIPFSJob(jobData.process, jobData.data);
-    }
-    if (channel === 'project-channel') {
-      const jobData = JSON.parse(message);
-      this.queueService.addProjectJob(jobData.process, jobData.data);
-    }
-    if (channel === 'user-channel') {
-      const jobData = JSON.parse(message);
-      this.queueService.addUserJob(jobData.process, jobData.data);
     }
   }
 
