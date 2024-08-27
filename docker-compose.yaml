@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - '8887:7776'
+      - '8886:7776'
     volumes:
       - ../logs/u2u-marketplace-worker-analysis:/usr/src/app/u2u-server-worker-analysis/logs
     networks:
