@@ -66,6 +66,7 @@ model NFT {
   MarketplaceByTokenId                    MarketplaceStatus[] @relation("Marketplace_byId")
   metricPoint                             BigInt?            @default(0)
   metricDetail                            Json?              @default("{\"VolumeIndividual\":0,\"UserMetric\":0}")
+  source                                  String?
 
   @@id([id, collectionId])
   @@index([u2uId, collectionId])
@@ -114,6 +115,7 @@ model Collection {
   lastTimeSync                            Int?               @default(0)
   metricPoint                             BigInt?            @default(0)
   metricDetail                            Json?              @default("{\"Verified\":0,\"Volume\":{\"key\":\"volume_lv0\",\"value\":\"0\",\"point\":0,\"total\":0},\"TotalUniqueOwner\":{\"key\":\"owner_lv0\",\"value\":\"0\",\"point\":0,\"total\":0},\"TotalItems\":{\"key\":\"item_lv0\",\"value\":0,\"point\":0,\"total\":0},\"Followers\":{\"key\":\"follower_lv0\",\"value\":0,\"point\":0,\"total\":0}}")
+  source                                  String?
   AnalysisCollection                      AnalysisCollection[]
   @@index([address], type: Hash)
 }
@@ -286,18 +288,16 @@ model QuoteTokens {
 }
 
 model AnalysisCollection {
-  id               String           @id
-  collectionId     String           @db.Uuid
+  id               String               @id
+  collectionId     String               @db.Uuid
   keyTime          String
   address          String  
   type             CONTRACT_TYPE
-  volume           Decimal          @default(0) @db.Decimal(78, 0)
-  volumeWei        String           @default("0")
-  floorPrice       BigInt           @default(0)
-  items            BigInt           @default(0)
-  owner            BigInt           @default(0)
-  createdAt        DateTime         @default(now()) @db.Date
-  collection       Collection       @relation(fields: [collectionId], references: [id])
+  volume           Decimal              @default(0) @db.Decimal(78, 0)
+  volumeWei        String               @default("0")
+  floorPrice       BigInt               @default(0)
+  items            BigInt               @default(0)
+  owner            BigInt               @default(0)
+  createdAt        DateTime             @default(now()) @db.Date
+  collection       Collection           @relation(fields: [collectionId], references: [id])
 }
-
-
