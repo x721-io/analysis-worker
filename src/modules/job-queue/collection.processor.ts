@@ -18,6 +18,7 @@ import { logger } from 'src/commons';
 import { OnModuleInit } from '@nestjs/common';
 import { ethers } from 'ethers';
 import PQueue from 'p-queue';
+import * as moment from 'moment';
 
 interface CollectionGeneral {
   totalOwner: number;
@@ -235,5 +236,56 @@ export class CollectionsCheckProcessor implements OnModuleInit {
 
   weiToEther(wei) {
     return wei / 1000000000000000000;
+  }
+
+  @Cron('30 23 * * *')
+  async handleRemoveOutDate() {
+    try {
+      const { start } = this.getPastDay(32);
+      const batchSize = 1000;
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const listOutDate = await this.prisma.analysisCollection.findMany({
+          where: {
+            createdAt: {
+              lte: start,
+            },
+          },
+          select: {
+            id: true,
+          },
+          take: batchSize,
+          skip: offset,
+        });
+        if (listOutDate && listOutDate.length > 0) {
+          const listOutDateFormat = listOutDate.map((item) => {
+            return item.id;
+          });
+          await this.prisma.analysisCollection.deleteMany({
+            where: {
+              id: {
+                in: listOutDateFormat,
+              },
+            },
+          });
+          offset += batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
+      logger.info('handleRemoveOutDate successful');
+    } catch (error) {
+      logger.error(`handleRemoveOutDate: ${error}`);
+    }
+  }
+
+  getPastDay(number: number) {
+    const date = new Date();
+    const momentDate = moment(date).subtract(number, 'days');
+    return {
+      start: momentDate.utc().startOf('day').toDate(),
+      end: momentDate.utc().endOf('day').toDate(),
+    };
   }
 }
