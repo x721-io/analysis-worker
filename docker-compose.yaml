@@ -1,7 +1,7 @@
 version: '3'
 services:
-  ext-server-analysis:
-    container_name: u2u-server-worker-analysis
+  worker-analysis:
+    container_name: x721w-analysis
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,11 +9,6 @@ services:
     ports:
       - '8886:7776'
     volumes:
-      - ../logs/u2u-marketplace-worker-analysis:/usr/src/app/u2u-server-worker-analysis/logs
-    networks:
-      - u2u-nw
+      - ../logs/x721w-analysis:/usr/src/app/x721w-analysis/logs
     env_file:
       - .env
-networks:
-  u2u-nw:
-    external: true
