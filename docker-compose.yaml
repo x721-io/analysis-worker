@@ -12,3 +12,7 @@ services:
       - ../logs/x721w-analysis:/usr/src/app/x721w-analysis/logs
     env_file:
       - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: 300m
