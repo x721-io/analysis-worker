@@ -116,6 +116,8 @@ model Collection {
   metricPoint                             BigInt?            @default(0)
   metricDetail                            Json?              @default("{\"Verified\":0,\"Volume\":{\"key\":\"volume_lv0\",\"value\":\"0\",\"point\":0,\"total\":0},\"TotalUniqueOwner\":{\"key\":\"owner_lv0\",\"value\":\"0\",\"point\":0,\"total\":0},\"TotalItems\":{\"key\":\"item_lv0\",\"value\":0,\"point\":0,\"total\":0},\"Followers\":{\"key\":\"follower_lv0\",\"value\":0,\"point\":0,\"total\":0}}")
   source                                  String?
+  floor                                   Float                @default(0)
+  floorWei                                String               @default("0")
   AnalysisCollection                      AnalysisCollection[]
   @@index([address], type: Hash)
 }
@@ -296,6 +298,8 @@ model AnalysisCollection {
   volume           Decimal              @default(0) @db.Decimal(78, 0)
   volumeWei        String               @default("0")
   floorPrice       BigInt               @default(0)
+  floor            Float                @default(0)
+  floorWei         String               @default("0")
   items            BigInt               @default(0)
   owner            BigInt               @default(0)
   createdAt        DateTime             @default(now()) @db.Date

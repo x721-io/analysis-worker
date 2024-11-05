@@ -19,6 +19,7 @@ import { OnModuleInit } from '@nestjs/common';
 import { ethers } from 'ethers';
 import PQueue from 'p-queue';
 import * as moment from 'moment';
+import OtherCommon from 'src/commons/Other.common';
 
 interface CollectionGeneral {
   totalOwner: number;
@@ -34,6 +35,8 @@ interface AnalysisObject {
   volumeWei: string;
   totalNft: number;
   floorPrice: number;
+  floor: number;
+  floorWei: string;
   address: string;
   id: string;
   // floorPrice: bigint;
@@ -74,6 +77,8 @@ export class CollectionsCheckProcessor implements OnModuleInit {
             flagExtend: true,
             type: true,
             floorPrice: true,
+            floor: true,
+            floorWei: true,
             txCreationHash: true,
           },
           take: batchSize,
@@ -93,7 +98,7 @@ export class CollectionsCheckProcessor implements OnModuleInit {
             const inputAnalysis: AnalysisObject = {
               ...item,
               floorPrice: Number(item.floorPrice),
-              volume: this.weiToEther(volume),
+              volume: OtherCommon.weiToEther(volume),
               volumeWei: `${volume}`,
               totalNft: Number(totalNft),
               totalOwner: Number(totalOwner),
@@ -162,7 +167,7 @@ export class CollectionsCheckProcessor implements OnModuleInit {
       };
     }
   }
-
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async CountExternalCollection() {
     try {
       const externalCollections = await this.prisma.collection.findMany({
@@ -188,7 +193,7 @@ export class CollectionsCheckProcessor implements OnModuleInit {
             totalNft: totalNftExternal.toString(),
             totalOwner: totalOwnerExternal.toString(),
           },
-          604800,
+          20,
         );
       }
       logger.info('handleExternalCollection successful');
@@ -223,6 +228,8 @@ export class CollectionsCheckProcessor implements OnModuleInit {
             type: input.type,
             address: input.address,
             floorPrice: input.floorPrice,
+            floor: input.floor,
+            floorWei: input.floorWei,
             volume: input.volume,
             owner: input.totalOwner,
             items: input.totalNft,
@@ -232,10 +239,6 @@ export class CollectionsCheckProcessor implements OnModuleInit {
     } catch (error) {
       logger.error(`getAndCaculator: ${error}`);
     }
-  }
-
-  weiToEther(wei) {
-    return wei / 1000000000000000000;
   }
 
   @Cron('30 23 * * *')
