@@ -271,6 +271,10 @@ class OtherCommon {
   delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+
+  weiToEther(wei) {
+    return wei / 1000000000000000000;
+  }
 }
 
 export default new OtherCommon();
