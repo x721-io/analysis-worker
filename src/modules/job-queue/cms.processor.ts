@@ -6,7 +6,7 @@ import { QUEUE_NAME_CMS } from 'src/constants/Job.constant';
 import { Cron } from '@nestjs/schedule';
 import { logger } from 'src/commons';
 import { OnModuleInit } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { ORDERSTATUS, ORDERTYPE, Prisma } from '@prisma/client';
 import subgraphServiceCommon from '../helper/subgraph-helper.service';
 import { ethers } from 'ethers';
 import { RedisSubscriberService } from './redis.service';
@@ -93,46 +93,80 @@ export class CMSProcessor implements OnModuleInit {
 
   async getCountTransaction(input: any) {
     try {
-      let hasMore = true;
-      const batchSize = 1000;
-      let offset = 0;
       let count = 0;
-      const maxConcurrentRequests = 20; // Number of concurrent requests
-      const promises = [];
-
-      while (hasMore) {
-        const fetchBatch = async (currentOffset: number) => {
-          const result = await subgraphServiceCommon.getSummaryTransaction(
-            input.event,
-            currentOffset,
-            batchSize,
-          );
-          return result;
-        };
-
-        for (let i = 0; i < maxConcurrentRequests && hasMore; i++) {
-          promises.push(fetchBatch(offset + i * batchSize));
-        }
-
-        const results = await Promise.all(promises);
-
-        results.forEach((result) => {
-          if (result && result.blocks && result.blocks.length > 0) {
-            count += result.blocks.length;
-          } else {
-            hasMore = false;
-          }
+      if (input.event == EventType.Trade) {
+        count = await this.prisma.order.count({
+          where: {
+            orderType: {
+              in: [ORDERTYPE.BULK, ORDERTYPE.SINGLE],
+            },
+          },
         });
-
-        offset += batchSize * maxConcurrentRequests;
-        promises.length = 0; // Clear the promises array for the next batch
+      }
+      if (input.event == EventType.Bid) {
+        count = await this.prisma.order.count({
+          where: {
+            orderType: ORDERTYPE.BID,
+          },
+        });
       }
 
+      if (input.event == EventType.AcceptBid) {
+        count = await this.prisma.order.count({
+          where: {
+            orderType: ORDERTYPE.BID,
+            orderStatus: ORDERSTATUS.FILLED,
+          },
+        });
+      }
       return count;
     } catch (error) {
       logger.error(`getCountTransaction: ${error}`);
     }
   }
+
+  // async getCountTransaction(input: any) {
+  //   try {
+  //     let hasMore = true;
+  //     const batchSize = 1000;
+  //     let offset = 0;
+  //     let count = 0;
+  //     const maxConcurrentRequests = 20; // Number of concurrent requests
+  //     const promises = [];
+
+  //     while (hasMore) {
+  //       const fetchBatch = async (currentOffset: number) => {
+  //         const result = await subgraphServiceCommon.getSummaryTransaction(
+  //           input.event,
+  //           currentOffset,
+  //           batchSize,
+  //         );
+  //         return result;
+  //       };
+
+  //       for (let i = 0; i < maxConcurrentRequests && hasMore; i++) {
+  //         promises.push(fetchBatch(offset + i * batchSize));
+  //       }
+
+  //       const results = await Promise.all(promises);
+
+  //       results.forEach((result) => {
+  //         if (result && result.blocks && result.blocks.length > 0) {
+  //           count += result.blocks.length;
+  //         } else {
+  //           hasMore = false;
+  //         }
+  //       });
+
+  //       offset += batchSize * maxConcurrentRequests;
+  //       promises.length = 0; // Clear the promises array for the next batch
+  //     }
+
+  //     return count;
+  //   } catch (error) {
+  //     logger.error(`getCountTransaction: ${error}`);
+  //   }
+  // }
 
   async getCountVolume() {
     try {

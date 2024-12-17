@@ -17,3 +17,11 @@ query CMSSummaryVolume($address: ID!) {
     id
   }
 }
+
+query getContract($address:ID!) {
+  contract(id: $address) {
+    id
+    count
+    contract
+  }
+}

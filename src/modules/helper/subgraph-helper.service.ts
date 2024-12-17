@@ -21,6 +21,8 @@ import {
   ErcContractQuery,
   ErcContractQueryVariables,
   EventType,
+  GetContractQuery,
+  GetContractQueryVariables,
   GetNfTsSelling1155QueryVariables,
   GetNfTsSelling721QueryVariables,
   getSdk,
@@ -228,6 +230,13 @@ class subgraphServiceCommon {
     };
     const response = await sdk.GetNFTsSelling1155(variables);
     return response;
+  }
+
+  async getContractInfor(collectionAddress: string): Promise<GetContractQuery> {
+    const client = new GraphQLClient(process.env.SUBGRAPH_URL);
+    const sdk = getSdk(client);
+    const variables: GetContractQueryVariables = { address: collectionAddress };
+    return await sdk.getContract(variables);
   }
 }
 

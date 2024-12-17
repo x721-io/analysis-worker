@@ -39,6 +39,7 @@ interface AnalysisObject {
   floorWei: string;
   address: string;
   id: string;
+  vol: number;
   // floorPrice: bigint;
 }
 
@@ -80,6 +81,8 @@ export class CollectionsCheckProcessor implements OnModuleInit {
             floor: true,
             floorWei: true,
             txCreationHash: true,
+            volumeWei: true,
+            vol: true,
           },
           take: batchSize,
           skip: offset,
@@ -94,10 +97,13 @@ export class CollectionsCheckProcessor implements OnModuleInit {
               item.address,
               item.type,
               item.flagExtend,
+              item?.volumeWei,
             );
             const inputAnalysis: AnalysisObject = {
               ...item,
               floorPrice: Number(item.floorPrice),
+              floor: item.floor,
+              floorWei: item.floorWei,
               volume: OtherCommon.weiToEther(volume),
               volumeWei: `${volume}`,
               totalNft: Number(totalNft),
@@ -121,6 +127,7 @@ export class CollectionsCheckProcessor implements OnModuleInit {
     collectionAddress: string,
     type: CONTRACT_TYPE,
     flagExtend = false,
+    volumeWei: string,
   ): Promise<CollectionGeneral> {
     if (!collectionAddress) {
       return {
@@ -140,27 +147,30 @@ export class CollectionsCheckProcessor implements OnModuleInit {
       totalOwnerExternal = resultExternal.totalOwnerExternal;
     }
 
-    const [statusCollection] = await Promise.all([
+    const [statusCollection, contractOwner] = await Promise.all([
       subgraphServiceCommon.getCollectionCount(collectionAddress),
+      subgraphServiceCommon.getContractInfor(collectionAddress),
       // this.getVolumeCollection(collectionAddress),
     ]);
 
     if (type === 'ERC721') {
       return {
-        volumn: statusCollection.erc721Contract?.volume || 0,
+        // volumn: statusCollection.erc721Contract?.volume || 0,
+        volumn: volumeWei || `0`,
         totalOwner: !!flagExtend
           ? totalOwnerExternal
-          : statusCollection.erc721Contract?.holderCount || 0,
+          : contractOwner?.contract?.count || 0,
         totalNft: !!flagExtend
           ? totalNftExternal
           : statusCollection.erc721Contract?.count || 0,
       };
     } else {
       return {
-        volumn: statusCollection.erc1155Contract?.volume || 0,
+        // volumn: statusCollection.erc1155Contract?.volume || 0,
+        volumn: volumeWei || `0`,
         totalOwner: !!flagExtend
           ? totalOwnerExternal
-          : statusCollection.erc1155Contract?.holderCount || 0,
+          : contractOwner?.contract?.count || 0,
         totalNft: !!flagExtend
           ? totalNftExternal
           : statusCollection.erc1155Contract?.count || 0,
@@ -224,15 +234,16 @@ export class CollectionsCheckProcessor implements OnModuleInit {
             keyTime: formattedDate,
             id: collectionId_createdAt,
             collectionId: input.id,
-            volumeWei: input.volumeWei,
             type: input.type,
             address: input.address,
-            floorPrice: input.floorPrice,
-            floor: input.floor,
-            floorWei: input.floorWei,
-            volume: input.volume,
             owner: input.totalOwner,
             items: input.totalNft,
+            volume: input.volume,
+            vol: Number(input.volumeWei) / 10 ** 18,
+            volumeWei: input.volumeWei,
+            floorPrice: BigInt(input.floorWei) / BigInt(10 ** 18),
+            floor: Number(input.floorWei) / 10 ** 18,
+            floorWei: input.floorWei.toString(),
           },
         });
       }
